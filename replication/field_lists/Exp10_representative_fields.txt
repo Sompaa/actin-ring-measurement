@@ -1,0 +1,20 @@
+# Exp10 (2026-01-13 plate 4): fields of the paper's representative images that were also in the analysed set,
+# so each has reference rows in the Exp10 CSV to compare against.
+B3_F08
+B4_F13
+B5_F13
+B6_F08
+B6_F10
+B7_F11
+C6_F03
+C9_F13
+D3_F09
+D4_F13
+D5_F11
+D6_F13
+D11_F09
+E4_F03
+E4_F13
+E5_F08
+E8_F09
+F10_F08

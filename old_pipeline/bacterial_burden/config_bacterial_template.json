@@ -1,0 +1,143 @@
+{
+  "_description": "Bacterial Burden Quantification Pipeline - Configuration Template",
+  "_usage": "Copy this file to config_bacterial.json and fill in your paths and plate layout",
+
+  "batch_mode": false,
+  "_batch_mode_note": "Set true and add 'experiments' list for multi-experiment processing",
+
+  "input_dir": "D:\\path\\to\\images",
+  "output_dir": "C:\\work\\results\\bacterial_burden",
+
+  "plate_layout": {
+    "_note": "Map well column numbers (as strings) to treatment names",
+    "1": "Negative Control",
+    "2": "Positive Control",
+    "3": "Treatment A - Low",
+    "4": "Treatment A - High",
+    "5": "Treatment B - Low",
+    "6": "Treatment B - High",
+    "7": "Treatment C - Low",
+    "8": "Treatment C - High",
+    "9": "Treatment D - Low",
+    "10": "Treatment D - High",
+    "11": "Positive Control",
+    "12": "Negative Control"
+  },
+  "group_colors": {
+    "_note": "Colors for plots, keyed by treatment name",
+    "Negative Control": "gray",
+    "Positive Control": "blue",
+    "Treatment A - Low": "orange",
+    "Treatment A - High": "red",
+    "Treatment B - Low": "lightgreen",
+    "Treatment B - High": "green",
+    "Treatment C - Low": "lightblue",
+    "Treatment C - High": "darkblue",
+    "Treatment D - Low": "plum",
+    "Treatment D - High": "purple"
+  },
+
+  "downsampling": {
+    "enabled": false,
+    "num_positions": 10,
+    "_num_positions_note": "Number of field positions to randomly select per well",
+    "seed": 42
+  },
+
+  "channels": {
+    "_note": "Channel indices in the [Z, C, Y, X] image stack",
+    "host_cytoplasm": 0,
+    "nuclei": 1,
+    "bacteria": 2
+  },
+
+  "z_projection": {
+    "method": "best_focus",
+    "_method_options": "best_focus (Variance of Laplacian - recommended for adhered vs intracellular), mip (Maximum Intensity Projection), single_middle (middle Z slice)"
+  },
+
+  "qc": {
+    "min_intensity_threshold": 50,
+    "_min_intensity_note": "Channels with max intensity below this are flagged as empty/failed",
+    "saturation_fraction_max": 0.01,
+    "_saturation_note": "Fraction of pixels at max value; above this threshold = saturated",
+    "skip_empty_images": true
+  },
+
+  "brightness_contrast": {
+    "_note": "Per-channel brightness/contrast/gamma adjustment applied before segmentation",
+    "host": {
+      "brightness": 1.5,
+      "contrast": 1.5,
+      "gamma": 0.9
+    },
+    "nuclei": {
+      "brightness": 2.0,
+      "contrast": 2.2,
+      "gamma": 0.9
+    },
+    "bacteria": {
+      "brightness": 1.8,
+      "contrast": 2.0,
+      "gamma": 0.85
+    }
+  },
+
+  "segmentation": {
+    "host_cell": {
+      "model": "cyto3",
+      "_model_note": "Cellpose model for host cell cytoplasm segmentation",
+      "diameter": 0,
+      "_diameter_note": "0 = auto-detect. Set manually if auto-detection fails",
+      "flow_threshold": 0.4,
+      "cellprob_threshold": 0.0,
+      "min_size": 200,
+      "use_nuclei_channel": true,
+      "_use_nuclei_note": "Feed nuclei channel as auxiliary input for better cell separation"
+    },
+    "nucleus": {
+      "model": "nuclei",
+      "diameter": 0,
+      "flow_threshold": 0.4,
+      "cellprob_threshold": 0.0,
+      "min_size": 80
+    },
+    "bacteria": {
+      "model": "bact_fluor_omni",
+      "_model_options": "bact_fluor_omni (fluorescence, recommended), bact_phase_omni (phase contrast)",
+      "diameter": 0,
+      "flow_threshold": 0.4,
+      "cellprob_threshold": 0.0,
+      "min_size": 5,
+      "use_omnipose": true
+    }
+  },
+
+  "filtering": {
+    "clear_border": true,
+    "_clear_border_note": "Remove host cells touching image edges",
+    "host_cell": {
+      "min_area": 1000,
+      "max_area": 500000,
+      "max_eccentricity": 0.95,
+      "_eccentricity_note": "0=circle, 1=line. Removes highly elongated artifacts",
+      "min_solidity": 0.7,
+      "_solidity_note": "Area / ConvexHullArea. Removes irregular/blebbing cells"
+    },
+    "require_single_nucleus": true,
+    "_nucleus_note": "Discard cells with 0 or >1 nuclei (dividing cells, syncytia, debris)"
+  },
+
+  "quantification": {
+    "dilation_pixels": 15,
+    "_dilation_note": "Ring width around cell boundary for detecting adhered bacteria",
+    "min_bacteria_area": 3,
+    "_min_area_note": "Minimum pixel area for a bacterial object to be counted"
+  },
+
+  "processing": {
+    "use_gpu": true,
+    "save_masks": false,
+    "_save_masks_note": "Save segmentation masks as TIFF for manual inspection"
+  }
+}

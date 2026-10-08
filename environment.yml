@@ -1,0 +1,26 @@
+# Environment the replication runs were made with (2026-10, Linux, NVIDIA GPU).
+#   conda env create -f environment.yml
+#   conda activate topoactin_v3
+# The January 2026 paper runs used a Windows "cellpose_gpu" env whose exact
+# versions were not recorded; Cellpose 4 (cpsam) is the closest known match.
+name: topoactin_v3
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - cellpose==4.2.1.1
+      - torch            # for a GPU build, follow https://pytorch.org (e.g. --index-url .../cu128)
+      - numpy>=2.0,<2.1
+      - scipy
+      - pandas
+      - scikit-image==0.26.*
+      - tifffile
+      - opencv-python-headless
+      - skan==0.13.*
+      - matplotlib
+      - seaborn
+      - tqdm
+      - jupyter
+      - ipywidgets

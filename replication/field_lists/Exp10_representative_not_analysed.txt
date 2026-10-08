@@ -1,0 +1,9 @@
+# Exp10 fields shown in figures but NOT in the paper's analysed set (no reference numbers).
+# You can run them, but there is nothing to compare the result with.
+D10_F02
+E7_F12
+B5_F14
+D3_F14
+D5_F02
+E4_F12
+E4_F14

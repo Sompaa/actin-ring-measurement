@@ -1,0 +1,15 @@
+# Never commit images, results or the reference data
+*.tif
+*.tiff
+*.csv
+*.pdf
+*.png
+*.npy
+*.npz
+input*/
+out*/
+results/
+stats_out/
+compare_out/
+__pycache__/
+.ipynb_checkpoints/

@@ -1,0 +1,12 @@
+# Exp1 held-out check set (fixed before calibration, random.Random(20261008)):
+# 2 KpSen + 2 BasR + 1 Control well, 2 analysed fields each. Never used to choose settings.
+D4_F17
+D4_F09
+B4_F06
+B4_F11
+B8_F09
+B8_F11
+G8_F09
+G8_F15
+B2_F26
+B2_F17
