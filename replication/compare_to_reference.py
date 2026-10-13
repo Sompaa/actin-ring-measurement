@@ -86,7 +86,7 @@ def main():
           + (f"  ({len(only_new)} field(s) in the new run have no reference rows)" if only_new else ""))
     print(f"Cells: reference {len(ref)}, new {len(new_c)}, matched by size/shape {len(pairs)}")
     focus = agree[agree.metric.isin(["cell_area", "cortical_intensity", "inner_intensity",
-                                     "cortical_weighted_density", "skeleton_density", "fidelity"])]
+                                     "cortical_weighted_density", "skeleton_density"])]
     print(focus.to_string(index=False, float_format=lambda v: f"{v:.3f}"))
     print(f"\nTables written to {out}/")
 

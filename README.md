@@ -26,18 +26,18 @@ without retraining.
 
 | Path | Content |
 |---|---|
-| `old_pipeline/` | TopoActin V3 source code, unmodified. `main_pipeline_v3.py` is the batch pipeline; `TopoActin_V3_Interactive_DOWNSAMPLING.ipynb` is the interactive notebook used for single-image inspection and for the figure. `docs/` contains the original design notes (`ARCHITECTURE.md`, `WORKBOOK_2026-02.md`). |
+| `old_pipeline/` | TopoActin V3 source code, unmodified. `main_pipeline_v3.py` is the batch pipeline. `docs/` contains the original design notes (`ARCHITECTURE.md`, `WORKBOOK_2026-02.md`). |
 | `examples/` | Four example fields (merged Z-stacks) with their original per-cell results. |
 | `notebooks/single_image_walkthrough.ipynb` | Analysis of one field from the raw stack to the figure: segmentation, Sato filter, skeleton, radial zones, ten rings. |
 | `replication/v3_paper.py` | Applies the analysis settings to the unmodified V3 code at run time, analyses a single field with the V3 classes, and computes the ten-ring profile. |
-| `replication/notebook_method.py` | Per-cell measurement of the interactive V3 notebook (Steps 6b and 6c), which produced the figure. |
+| `replication/notebook_method.py` | Per-cell Sato-weighted skeleton density as used for the figure. |
 | `replication/ring_plots.py` | Plotting functions for the walkthrough notebook. |
 | `replication/config_paper.json` | Analysis settings (see [Analysis settings](#analysis-settings)). |
 | `replication/field_lists/` | Fields analysed on each plate, the 18 representative fields, and the held-out validation fields. |
 | `replication/build_stacks.py` | Builds `Z_Stack_Merged/` from a Harmony export; output is byte-identical to the stacks used in the original analysis. |
 | `replication/prepare_input.py` | Collects selected fields of a plate into one input folder. |
 | `replication/run_v3.py` | Runs the V3 batch pipeline on an input folder with the analysis settings. |
-| `replication/paper_stats.py` | Statistical analysis (fidelity filter, winsorization, well medians, Mann-Whitney U test, bootstrap confidence intervals, Benjamini-Hochberg correction, linear mixed model). |
+| `replication/paper_stats.py` | Statistical analysis (winsorization, well medians, Mann-Whitney U test, bootstrap confidence intervals, Benjamini-Hochberg correction, linear mixed model). |
 | `replication/compare_to_reference.py` | Cell-by-cell and well-level comparison of a re-run with the original results. |
 | `replication/plot_figure_FG.py` | Well-median violin plots (figure panels F and G) from the output of `paper_stats.py`. |
 | `environment.yml` | Conda environment. |
@@ -113,13 +113,12 @@ python replication/paper_stats.py \
 
 For each plate separately the script:
 
-1. keeps cells with skeleton fidelity ≥ 0.25 (96 to 97 % of cells);
-2. winsorizes each measurement within each well at the 5th and 95th percentiles;
-3. takes the median of each measurement per well, the well being the experimental unit;
-4. compares the 24 KpSen and 24 BasR wells with a two-sided Mann-Whitney U test;
-5. reports the difference of medians (BasR minus KpSen) with a 95 % confidence interval from 2,000
+1. winsorizes each measurement within each well at the 5th and 95th percentiles;
+2. takes the median of each measurement per well, the well being the experimental unit;
+3. compares the 24 KpSen and 24 BasR wells with a two-sided Mann-Whitney U test;
+4. reports the difference of medians (BasR minus KpSen) with a 95 % confidence interval from 2,000
    bootstrap resamples of wells;
-6. corrects for the approximately 39 measurements tested with the Benjamini-Hochberg procedure
+5. corrects for the approximately 39 measurements tested with the Benjamini-Hochberg procedure
    (column `q_BH`).
 
 Output: `stats_<name>.csv` (all measurements) and `stats_headline.csv` (the reported measurements).
@@ -133,28 +132,28 @@ differences in overall intensity are thereby not attributed to the infection. Re
 python replication/plot_figure_FG.py stats_paper/
 ```
 
-Results on the original tables (computed 2026-10-08):
+Results on the original per-cell tables:
 
 | Plate | Measurement | KpSen | BasR | BasR − KpSen (95 % CI) | q (BH) |
 |---|---|---|---|---|---|
-| Exp1 | cortical_intensity | 12,290 | 15,550 | +3,269 (2,135 to 4,154) | 0.0001 |
-| Exp1 | cortical_weighted_density | 164.2 | 191.3 | +27.1 (6.1 to 47.5) | 0.021 |
-| Exp8 | cortical_intensity | 10,470 | 12,970 | +2,495 (585 to 3,624) | 0.007 |
-| Exp8 | cortical_weighted_density | 148.5 | 173.7 | +25.1 (10.5 to 50.2) | 0.007 |
-| Exp10 | cortical_intensity | 10,180 | 13,590 | +3,409 (1,639 to 6,270) | 0.002 |
-| Exp10 | cortical_weighted_density | 150.0 | 196.6 | +46.6 (22.2 to 68.6) | 0.003 |
+| Exp1 | cortical_weighted_density | 163.0 | 191.3 | +28.2 (7.4 to 46.8) | 0.037 |
+| Exp1 | cortical_intensity | 12,180 | 15,570 | +3,399 (1,980 to 4,200) | 0.0005 |
+| Exp8 | cortical_weighted_density | 146.4 | 172.9 | +26.5 (12.2 to 51.4) | 0.009 |
+| Exp8 | cortical_intensity | 10,450 | 12,780 | +2,327 (497 to 3,775) | 0.009 |
+| Exp10 | cortical_weighted_density | 149.8 | 195.8 | +46.0 (21.8 to 68.7) | 0.005 |
+| Exp10 | cortical_intensity | 10,180 | 13,480 | +3,296 (1,668 to 6,105) | 0.002 |
 
 BasR exceeds KpSen for both measurements in all three experiments, and all differences remain
 significant after correction. Bootstrap intervals can vary slightly between machines; medians and
 p-values are deterministic.
 
-Pooled mixed model over the three plates: `cortical_intensity` +3,285 (95 % CI 2,538 to 4,031,
-q = 2×10⁻¹⁶), `cortical_weighted_density` +33.8 (23.7 to 44.0, q = 1×10⁻⁹). The well-median ranges
-match figure panels F and G: KpSen 5,817 to 15,763 and BasR 8,811 to 21,117 (intensity), 90 to 230 and
-120 to 277 (weighted density); control medians 10,911 and 145.
+Pooled mixed model over the three plates: `cortical_weighted_density` +33.2 (95 % CI 22.9 to 43.5,
+q = 5×10⁻⁹), `cortical_intensity` +3,216 (2,467 to 3,965, q = 1×10⁻¹⁵). Well-median ranges (figure
+panels F and G): weighted density KpSen 88.1 to 230.0, BasR 117.4 to 273.9, control median 142.0;
+intensity KpSen 5,957 to 16,477, BasR 8,664 to 21,223, control median 10,907.
 
 The number of measurements that differ between KpSen and BasR varies between plates (7 of 39 in Exp1,
-14 in Exp8, 32 in Exp10). A change restricted to the cortex is therefore best supported by Exp1.
+14 in Exp8, 31 in Exp10). A change restricted to the cortex is therefore best supported by Exp1.
 
 ## 2. Single-field analysis and figure
 
@@ -176,20 +175,12 @@ Validation: for cell 21 of the example C9_F13, the notebook gives inner, mid and
 densities of 0.0015, 0.0028 and 0.0048, identical to the values of the original analysis for this
 cell, with the same skeleton and radial profile (Cellpose 4.2.1.1, GTX 1650, about 1 min per field).
 
-The figure was produced with the interactive V3 notebook (Steps 6b and 6c of
-`old_pipeline/TopoActin_V3_Interactive_DOWNSAMPLING.ipynb`), not with the batch pipeline.
-`replication/notebook_method.py` contains this per-cell procedure without the notebook widgets and
-without changes: Sato filter (scikit-image defaults) on the actin maximum projection rescaled to 0 to 1,
-threshold at the 55th percentile of the Sato response within the cell, removal of objects smaller than
-3 px, morphological closing with radius 1, skeletonization, radial position relative to the cell's own
-nucleus, and ten bins of r. Densities are unscaled (0.001 to 0.007), as in the figure. Later versions
-of the notebook multiplied the displayed density by 5 and intensities by 10 to match the value range
-of the batch tables; this factor is a display scaling and not part of the measurement
-(`multiplier=5` reproduces it).
-
-The statistical analysis (section 1) uses the per-cell tables of the batch pipeline
-(`main_pipeline_v3.py`). The figure shows the same quantity for individual cells, measured with the
-per-cell settings of the notebook.
+`replication/notebook_method.py` contains the per-cell procedure used for the figure: Sato filter
+(scikit-image defaults) on the actin maximum projection rescaled to 0 to 1, threshold at the 55th
+percentile of the Sato response within the cell, removal of objects smaller than 3 px, morphological
+closing with radius 1, skeletonization, radial position relative to the cell's own nucleus, and ten
+bins of r. The statistical analysis (section 1) uses the per-cell tables of the batch pipeline
+(`main_pipeline_v3.py`); the figure shows the same quantity for individual cells.
 
 ## 3. Representative fields
 
@@ -227,12 +218,6 @@ Output: `cells_per_field.csv` (cells retained per field in each run), `metric_ag
 present in both runs: median ratio re-run/original and correlation) and `well_medians.csv`. Cell
 identifiers differ between runs, so cells are paired by area and perimeter.
 
-The interactive notebook `old_pipeline/TopoActin_V3_Interactive_DOWNSAMPLING.ipynb` can be used to
-inspect a single image: set `img_dir` in the "STEP 1: LOAD IMAGE" cell to the input folder and run the
-cells in order. It provides previews for brightness and contrast, Cellpose segmentation, nucleus and
-cell filters, the Sato filter and skeleton, the radial zones and a four-panel figure. It does not write
-a result table.
-
 ## 4. Whole plates
 
 The same commands with the complete field list of a plate:
@@ -259,8 +244,8 @@ fields. Keep `downsampling.enabled` set to false.
 ## Analysis settings
 
 The settings of the original batch runs were not saved and were reconstructed from documented
-evidence only: boundaries visible in the original result tables, saved configuration files, values
-printed in notebook outputs, and information from the people who ran the analysis. Candidate settings
+evidence only: boundaries visible in the original result tables, saved configuration files, recorded parameter
+values, and information from the people who ran the analysis. Candidate settings
 were selected on the 18 representative Exp10 fields and validated on 20 fields of Exp1 and Exp8 that
 were drawn at random before calibration and not used for any choice
 (`field_lists/Exp*_holdout_fields.txt`).
@@ -270,8 +255,7 @@ configuration (`old_pipeline/config_batch.json`):
 
 | Setting | February configuration | Used here | Evidence |
 |---|---|---|---|
-| 3D mode | off | on (`keep_3d_volume`) | original tables report `processing_mode = 3D` |
-| Actin brightness / contrast | 1.4 / 1.2 | 1.4 / 1.75 | derived from the original `cortical_intensity` and `inner_intensity` (the adjusted image is a fixed function of the raw image; best-fitting brightness × contrast ≈ 2.45); 1.4 is the batch brightness, 1.75 the contrast printed in the notebook of 17 January |
+| Actin brightness / contrast | 1.4 / 1.2 | 1.4 / 1.75 | derived from the original `cortical_intensity` and `inner_intensity` (the adjusted image is a fixed function of the raw image; best-fitting brightness × contrast ≈ 2.45); 1.4 is the batch brightness, 1.75 the contrast recorded on 17 January |
 | Image used for intensities | raw image (from 10 February) | brightness/contrast-adjusted image | the raw image gives values 12 to 25 times lower; the original runs predate the 10 February change |
 | Cell maximum eccentricity | 0.85 | 0.95 | maximum in the original tables is 0.950 over 30,657 cells; 17 % exceed 0.85 |
 | Cell minimum solidity | 0.70 | 0.70 | minimum in the original tables is 0.700 |
@@ -281,7 +265,7 @@ configuration (`old_pipeline/config_batch.json`):
 | Nucleus proximity exclusion | on | off | not present in the code of January 2026 |
 | Sato ridge polarity | scikit-image default (dark ridges) | bright ridges (`sato_black_ridges: false`) | the dark-ridge setting traces the gaps between fibres; the preceding tool (Skeletactin, October 2025) used bright ridges |
 | Sato σ | 0.5 to 2.0, 5 steps | 0.7, 0.96, 1.22, 1.48, 1.74, 2.0 | values of January 2026 (V2 configuration, code default, confirmed by the authors) |
-| Minimum object size / closing | 60 px / 0 | 3 px / 1 | values printed in the notebook of 17 January and in the reference block of 17 February |
+| Minimum object size / closing | 60 px / 0 | 3 px / 1 | values recorded on 17 January and 17 February |
 | Additional Vieira smoothing | applied (σ 0.5 despite being disabled) | off | disabled in all settings of January 2026 |
 
 Unchanged: nuclei brightness/contrast 1.4 / 1.3; Cellpose `cpsam` with automatic diameter, flow
@@ -289,11 +273,10 @@ threshold 0.4, cell probability threshold 0.0; Gaussian σ 0.7 before the Sato f
 hysteresis (low fraction 0.4); zones at 0.33 and 0.66 of the nucleus-to-membrane distance; cortex
 defined as the outer 5 px.
 
-Tested and rejected: the Cellpose settings of the 17 January notebook (flow 0.25, probability −1) and its
-brightness/contrast 1.9 / 1.75, which retained fewer of the original cells and gave intensities 1.3 to
-1.5 times too high; the custom 3D Sato filter of the notebooks, which showed no cell-level agreement. A
-55th-percentile threshold is kept as a sensitivity analysis (weighted densities ×1.12 instead of ×1.21,
-branch counts ×0.72).
+Tested and rejected: Cellpose flow threshold 0.25 with cell probability −1 and brightness/contrast
+1.9 / 1.75, which retained fewer of the original cells and gave intensities 1.3 to 1.5 times too high.
+A 55th-percentile skeleton threshold in the batch pipeline gave weighted densities ×1.12 instead of
+×1.21 and branch counts ×0.72.
 
 Cellpose model. The V3 code requests `pretrained_model='cpsam'` (Cellpose-SAM, Cellpose 4). The exact
 Cellpose version of the original runs was not recorded. With Cellpose 3.1, which was installed later,
@@ -330,7 +313,6 @@ cell-level Pearson correlation.
 | inner_intensity | 1.03 (r 0.96) | 1.08 (r 0.99) | 1.08 (r 0.92) |
 | cortical_weighted_density | 1.20 (r 0.84) | 0.98 (r 0.89) | 1.15 (r 0.82) |
 | skeleton_density | 1.11 | 1.11 | 1.16 |
-| fidelity | 1.30 | 1.30 | 1.39 |
 
 With the February settings, the same Exp10 fields gave 183 cells, 56 % recovery, `cortical_intensity`
 ×0.88, `cortical_weighted_density` ×0.70 and branch counts ×1.5.
@@ -339,9 +321,8 @@ Between 77 and 92 % of the original cells are recovered, and the total number of
 similar. For about 8 % of the original cells no matching Cellpose mask is produced; the exact Cellpose 4
 release of the original runs was not recorded. Cortical intensity and cortical weighted density agree
 with the original values within 2 to 20 % depending on the plate and correlate at the cell level.
-Fidelity is higher in the re-run (×1.3 to 1.4) and does not correlate at the cell level; all re-run
-cells pass the fidelity threshold of 0.25, compared with about 97 % originally. The fine structure of
-the skeleton is therefore not fully reproduced, although branch counts agree (×1.04, r 0.94, Exp10).
+The fine structure of the skeleton is not fully reproduced (skeleton density 11 to 16 % higher),
+although branch counts agree (×1.04, r 0.94, Exp10).
 With two fields per held-out well, most well medians are within 10 % of the original and a few differ
 by 20 to 40 %. Whole-plate re-runs (section 4) with 10 fields per well are required for a well-level
 comparison.

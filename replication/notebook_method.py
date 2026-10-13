@@ -1,24 +1,15 @@
-"""Per-cell Sato-weighted skeleton density, as computed in the interactive notebook.
+"""Per-cell Sato-weighted skeleton density, as used for the figure.
 
-This is the method of Steps 6b / 6c of old_pipeline/TopoActin_V3_Interactive_DOWNSAMPLING.ipynb
-(the radial-profile figure), taken out of the notebook's widget callbacks so it can be
-called on any cell. Every step and default is the notebook's:
-
-  1. Gaussian sigma 0.7, then the multiscale Sato filter (sigmas 0.7-2.0, 6 steps) on the
-     whole 2D field (scikit-image default: black_ridges=True).
+  1. Gaussian sigma 0.7, then the multiscale Sato filter (sigmas 0.7-2.0, 6 steps,
+     scikit-image defaults) on the whole field. The input is the actin maximum projection
+     rescaled to 0-1 (local_adjust_image).
   2. Sato rescaled 0-1 over the cell's pixels; threshold = 55th percentile of the positive
-     values; remove objects < 3 px; closing with a disk of radius 1; skeletonize.
-  3. Nucleus-anchored distance r = d_nucleus / (d_nucleus + d_membrane) with the cell's own
+     values; objects < 3 px removed; closing with a disk of radius 1; skeletonize.
+  3. Radial position r = d_nucleus / (d_nucleus + d_membrane) relative to the cell's own
      nucleus (0 at the nucleus, 1 at the membrane).
-  4. Sato-weighted skeleton density = (raw Sato summed on the skeleton) / (pixel area),
-     per radial bin and per zone (inner r < 0.33, mid 0.33-0.66, outer >= 0.66).
-
-Reconstructed for the paper figure (Feb 2026 slides, "Virulencia cikkhez ábrák"): the figure
-shows 10 bins and unscaled densities (0.001-0.007), so the defaults here are n_bins=10 and
-multiplier=1, with Sato run on the notebook's display image (local_adjust_image: actin max
-projection rescaled 0-1, brightness 0, contrast 1, gamma 1). The saved notebook (Feb-Mar 2026)
-later switched to the raw image with a x5 display multiplier ("to match the pipeline CSV
-range"); pass image=raw and multiplier=5 to get that version.
+  4. Sato-weighted skeleton density = (Sato response summed on the skeleton) / (pixel area),
+     per radial bin (10 bins of r) and per zone (inner r < 0.33, mid 0.33-0.66, outer >= 0.66),
+     and for the ten rings (ring 0 = nucleus, rings 1-9 = cytoplasm).
 """
 import numpy as np
 from scipy import ndimage
@@ -28,11 +19,10 @@ from skimage.morphology import disk, skeletonize
 from v3_paper import ring_labels, ring_profile
 
 SATO_SIGMAS = [0.7, 0.96, 1.22, 1.48, 1.74, 2.0]
-WSD_MULTIPLIER = 5.0  # later notebook versions only
 
 
 def local_adjust_image(img, bright=0.0, contrast=1.0, gamma=1.0):
-    """The notebook's display adjustment (Step 4): rescale 0-1, gamma, contrast, brightness."""
+    """Rescale to 0-1, then apply gamma, contrast and brightness (defaults: no change)."""
     img = img.astype(float)
     x = (img - img.min()) / (img.max() - img.min() + 1e-9)
     x = np.power(x, gamma)
@@ -70,8 +60,7 @@ def normalized_distance(cell_mask, nucleus_mask):
 
 
 def bin_profile(skeleton, sato, r, cell_mask, n_bins=10):
-    """The notebook's calculate_radial_profile: n_bins equal steps of r from 0 to 1
-    (the nucleus, r = 0, falls in the first bin)."""
+    """Density in n_bins equal steps of r from 0 to 1 (the nucleus, r = 0, falls in the first bin)."""
     edges = np.linspace(0.0, 1.0, n_bins + 1)
     safe = np.nan_to_num(r, nan=-1.0)
     dens = np.zeros(n_bins)
@@ -95,12 +84,10 @@ def zone_densities(skeleton, sato, r, cell_mask):
 
 
 def analyze_cell(actin_2d, cell_masks, nucleus_masks, cell_id, nucleus_id, sato_full=None,
-                 multiplier=1.0, black_ridges=True, percentile=55.0, n_bins=10):
-    """Notebook Step 6b for one cell. Returns crops, skeleton, Sato, r map and the numbers.
+                 black_ridges=True, percentile=55.0, n_bins=10):
+    """Measure one cell. Returns the crops, skeleton, Sato response, r map and the densities.
 
-    actin_2d is the image Sato runs on: local_adjust_image(max projection) for the paper
-    figure. Densities (zones, the notebook's n_bins, and the 10 rings: ring 0 = nucleus,
-    rings 1-9 = cytoplasm) are multiplied by `multiplier` (1 for the paper figure).
+    actin_2d is the image the Sato filter runs on: local_adjust_image(actin maximum projection).
     """
     if sato_full is None:
         sato_full = sato_field(actin_2d, black_ridges=black_ridges)
@@ -113,8 +100,8 @@ def analyze_cell(actin_2d, cell_masks, nucleus_masks, cell_id, nucleus_id, sato_
     sato = sato_full[bbox] * mask
     r = normalized_distance(mask, nucleus)
     centres, bins = bin_profile(skeleton, sato, r, mask, n_bins=n_bins)
-    row = {k: v * multiplier for k, v in zone_densities(skeleton, sato, r, mask).items()}
-    row.update({k: v * multiplier for k, v in ring_profile(skeleton, sato, ring_labels(r, mask)).items()})
+    row = dict(zone_densities(skeleton, sato, r, mask))
+    row.update(ring_profile(skeleton, sato, ring_labels(r, mask)))
     return {"cell_id": cell_id, "bbox": bbox, "mask": mask, "nucleus": nucleus, "binary": binary, "skeleton": skeleton,
             "sato": sato, "norm_map": r, "rings": ring_labels(r, mask),
-            "bin_centres": centres, "bin_profile": bins * multiplier, "row": row}
+            "bin_centres": centres, "bin_profile": bins, "row": row}

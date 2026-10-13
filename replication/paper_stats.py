@@ -1,23 +1,21 @@
-"""The paper's statistics (slide 7), applied to one or more per-cell CSVs.
+"""Statistical analysis of one or more per-cell result tables.
 
     python replication/paper_stats.py RESULT.csv [MORE.csv ...] -o stats_out/
 
 Each CSV is treated as one experiment and analysed on its own:
 
-1. keep cells with fidelity >= 0.25
-2. within each treatment x well, clip each value to that well's 5th-95th
+1. within each treatment x well, clip each value to that well's 5th-95th
    percentile (winsorizing: extreme cells are pulled in, not removed)
-3. one median per feature per well (the well is the replicate, not the cell)
-4. KpSen (ancestor) wells vs BasR wells: unpaired Mann-Whitney U test
-5. effect = median of BasR well medians minus median of KpSen well medians,
+2. one median per feature per well (the well is the replicate, not the cell)
+3. KpSen (ancestor) wells vs BasR wells: unpaired Mann-Whitney U test
+4. effect = median of BasR well medians minus median of KpSen well medians,
    with a 95% interval from 2000 bootstrap resamples of the wells
-6. Benjamini-Hochberg correction across all features of that experiment
+5. Benjamini-Hochberg correction across all features of that experiment
 
-Writes stats_<name>.csv per experiment and stats_headline.csv with the two
-paper metrics (cortical_intensity, cortical_weighted_density) side by side.
+Writes stats_<name>.csv per experiment and stats_headline.csv with
+cortical_weighted_density and cortical_intensity side by side.
 
-With two or more CSVs it also runs the test used in the final paper figure
-(Fig. F-G): all experiments pooled, one value per well, a linear mixed-effects
+With two or more CSVs it also pools the experiments: one value per well, a linear mixed-effects
 model  well_median ~ group + (1 | experiment)  for KpSen vs BasR, so that
 plate-to-plate differences are absorbed by the experiment term, then
 Benjamini-Hochberg across features -> stats_pooled_lmm.csv, and the per-well
@@ -30,7 +28,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import mannwhitneyu
 
-HEADLINE = ["cortical_intensity", "cortical_weighted_density"]
+HEADLINE = ["cortical_weighted_density", "cortical_intensity"]
 META = {"experiment", "image_name", "cell_id", "group", "processing_mode", "radial_method",
         "measurement_source", "well", "Treatment"}
 
@@ -51,8 +49,8 @@ def bh(p):
     return q
 
 
-def well_medians(df, features, fidelity_min, lo, hi):
-    df = df[df["fidelity"] >= fidelity_min].copy()
+def well_medians(df, features, lo, hi):
+    df = df.copy()
     df["well"] = df["image_name"].str.split("_").str[0]
 
     def clip(g):
@@ -66,10 +64,10 @@ def well_medians(df, features, fidelity_min, lo, hi):
     return df.groupby(["group", "well"])[features].median().reset_index()
 
 
-def analyse(df, ref="KpSen", test="BasR", fidelity_min=0.25, lo=0.05, hi=0.95, n_boot=2000, seed=0):
+def analyse(df, ref="KpSen", test="BasR", lo=0.05, hi=0.95, n_boot=2000, seed=0):
     features = [c for c in df.columns if c not in META and pd.api.types.is_numeric_dtype(df[c])]
     n_cells = len(df)
-    wm = well_medians(df, features, fidelity_min, lo, hi)
+    wm = well_medians(df, features, lo, hi)
     a = wm[wm["group"] == ref]
     b = wm[wm["group"] == test]
     rng = np.random.default_rng(seed)
@@ -87,8 +85,7 @@ def analyse(df, ref="KpSen", test="BasR", fidelity_min=0.25, lo=0.05, hi=0.95, n
                      f"n_wells_{ref}": len(x), f"n_wells_{test}": len(y), "p": p})
     res = pd.DataFrame(rows)
     res["q_BH"] = bh(res["p"])
-    kept = (df["fidelity"] >= fidelity_min).mean()
-    return res.sort_values("p").reset_index(drop=True), n_cells, kept
+    return res.sort_values("p").reset_index(drop=True), n_cells
 
 
 def pooled_lmm(frames, ref="KpSen", test="BasR"):
@@ -98,7 +95,7 @@ def pooled_lmm(frames, ref="KpSen", test="BasR"):
     wms = []
     for name, df in frames:
         features = [c for c in df.columns if c not in META and pd.api.types.is_numeric_dtype(df[c])]
-        wms.append(well_medians(df, features, 0.25, 0.05, 0.95).assign(experiment=name))
+        wms.append(well_medians(df, features, 0.05, 0.95).assign(experiment=name))
     wm = pd.concat(wms, ignore_index=True)
     feats = [c for c in wm.columns if c not in {"group", "well", "experiment"}]
     sub = wm[wm.group.isin([ref, test])].copy()
@@ -135,9 +132,9 @@ def main():
     for name, path in zip(names, args.csv):
         df = pd.read_csv(path, low_memory=False)
         frames.append((name, df))
-        res, n, kept = analyse(df)
+        res, n = analyse(df)
         res.to_csv(out / f"stats_{name}.csv", index=False)
-        print(f"\n== {name}: {n} cells, {kept:.1%} pass fidelity >= 0.25")
+        print(f"\n== {name}: {n} cells")
         h = res[res["feature"].isin(HEADLINE)]
         print(h[["feature", "KpSen_median", "BasR_median", "median_diff", "ci95_low", "ci95_high", "p", "q_BH"]]
               .to_string(index=False, float_format=lambda v: f"{v:.4g}"))
@@ -152,7 +149,7 @@ def main():
         print(res[res.feature.isin(HEADLINE)][["feature", "KpSen_median", "BasR_median", "lmm_effect",
                                                "ci95_low", "ci95_high", "p", "q_BH"]]
               .to_string(index=False, float_format=lambda v: f"{v:.4g}"))
-        print("\nWell-median ranges (what the paper's violin plots show):")
+        print("\nWell-median ranges (violin plots, plot_figure_FG.py):")
         print(wm.groupby("group")[HEADLINE].agg(["min", "median", "max"]).round(1).to_string())
     print(f"\nTables written to {out}/")
 

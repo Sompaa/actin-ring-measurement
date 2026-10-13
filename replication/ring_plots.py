@@ -1,6 +1,6 @@
-"""Figures for notebooks/single_image_walkthrough.ipynb, in the style of the paper figure.
+"""Figures for notebooks/single_image_walkthrough.ipynb.
 
-Paper style (notebook Step 6c): actin red, nuclei blue; zones blue (inner, r < 0.33),
+Style of the figure: actin red, nuclei blue; zones blue (inner, r < 0.33),
 yellow (mid, 0.33-0.66), red (outer / cortical, >= 0.66); skeleton white; cell outline cyan;
 radial profile as a blue line with points over a light-blue fill, dashed lines at 0.33 / 0.66.
 """
@@ -57,7 +57,7 @@ def show_segmentation(actin, nuclei, cell_masks, nucleus_masks, kept):
 
 
 def eight_panels(cell, image):
-    """The notebook's Step 6b figure for one cell (the layout of the Feb 2026 slides)."""
+    """Intermediate steps for one cell, eight panels."""
     bbox, mask, skel = cell["bbox"], cell["mask"], cell["skeleton"]
     crop = np.where(mask, _unit(image[bbox]), 0)
     fig, ax = plt.subplots(2, 4, figsize=(20, 9))
@@ -105,7 +105,7 @@ def eight_panels(cell, image):
 
 
 def radial_profile(cell, ax=None):
-    """Sato-weighted skeleton density in the notebook's bins of r (0 = nucleus, 1 = membrane)."""
+    """Sato-weighted skeleton density in bins of r (0 = nucleus, 1 = membrane)."""
     fig, ax = (plt.subplots(figsize=(5, 4)) if ax is None else (ax.figure, ax))
     x, y = cell["bin_centres"], cell["bin_profile"]
     ax.fill_between(x, 0, y, color="steelblue", alpha=0.3)
@@ -122,11 +122,10 @@ def radial_profile(cell, ax=None):
 
 
 def paper_figure(cell, actin, nuclei, cell_masks, alpha=0.45, margin=150):
-    """The three panels of the paper figure: original image, radial overlay of the cell
+    """The three panels of the figure: original image, radial overlay of the cell
     (zones, skeleton, outline) and the radial distribution plot.
 
-    The two image panels show the cell's bounding box plus `margin` px on each side, as on the
-    paper figure; margin=None shows the whole field.
+    The two image panels show the cell's bounding box plus `margin` px on each side; margin=None shows the whole field.
     """
     rgb = composite(actin, nuclei)
     over = rgb.copy()
