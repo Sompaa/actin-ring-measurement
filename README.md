@@ -1,20 +1,31 @@
-# TopoActin V3: analysis guide (BasR vs KpSen, A549, 1 h)
+# Actin ring measurement: TopoActin V3 analysis guide (BasR vs KpSen, A549, 1 h)
 
-This repository holds the **TopoActin V3** cytoskeleton pipeline as it stood in February–March 2026
-(the "downsampling" version), plus a few small scripts that make it easy to re-run the analysis
-behind the paper result:
+This repository holds the **TopoActin V3** cytoskeleton pipeline as it stood in January–March 2026,
+and the scripts and notebook needed to reproduce the paper's actin measurement:
 
-> Compared with the ancestor strain (KpSen), basR G53V raises **cortical_intensity** and
-> **cortical_weighted_density** in A549 cells after 1 h of infection.
+> Compared with the ancestor strain (KpSen), basR G53V raises the **Sato-weighted skeleton density of the
+> cortical actin** (`cortical_weighted_density`, outer third of the cell) in A549 cells after 1 h of infection.
 
-The guide covers three things, from quickest to slowest:
+**The measurement.** For every pixel of a cell, r = d_nucleus / (d_nucleus + d_membrane) runs from 0 at the
+nucleus to 1 at the membrane. Actin fibres are enhanced with the multiscale Sato tubeness filter, thresholded
+and thinned to a one-pixel skeleton. In each radial bin (or zone), the Sato response is summed over the
+skeleton pixels and divided by the bin's area, so thick, bright bundles count more than faint filaments
+and bins of different size stay comparable. Zones: inner r < 0.33, mid 0.33–0.66, outer (cortical) ≥ 0.66.
+`--rings` and the notebook also give 10 rings (ring 0 = nucleus, rings 1–9 = cytoplasm) and the rings
+merged 3-3-3.
+
+The guide covers four things, from quickest to slowest:
 
 1. **Statistics only.** Re-do the paper's statistics from a per-cell result table (minutes, no images).
-2. **Representative images.** Re-run the image analysis on the 18 fields the paper's example images
+2. **One field, step by step.** `notebooks/single_image_walkthrough.ipynb` takes one field (by default
+   C9_F13, the BasR field of the paper figure) from the raw stack to the paper figure (a few minutes).
+3. **Representative images.** Re-run the image analysis on the 18 fields the paper's example images
    come from, and compare cell by cell with the original results (about 30 min on a GPU).
-3. **Whole plates.** Re-run a full plate (about 600 fields) and repeat the statistics on it (hours).
+4. **Whole plates.** Re-run a full plate (about 600 fields) and repeat the statistics on it (hours).
 
-No images or result tables are stored here. You need access to the plate folders (see
+**Example data to test with:** `examples/` holds four fields of the paper plate Exp10 (BasR C9_F13 and
+D10_F02, KpSen B5_F11, control D11_F09) and their January 2026 result rows (see `examples/README.md`).
+Whole plates are not stored here; for Steps 3–4 you need the plate folders (see
 [What you need](#what-you-need)).
 
 ---
@@ -24,6 +35,11 @@ No images or result tables are stored here. You need access to the plate folders
 | Path | What it is |
 |---|---|
 | `old_pipeline/` | The V3 code, unchanged. `main_pipeline_v3.py` is the batch pipeline; `TopoActin_V3_Interactive_DOWNSAMPLING.ipynb` is the interactive notebook for looking at one image step by step. `docs/` has the original design notes (`ARCHITECTURE.md`, `WORKBOOK_2026-02.md`). |
+| `examples/` | Four example fields (merged Z-stacks) and their January 2026 result rows, for testing. |
+| `notebooks/single_image_walkthrough.ipynb` | One field from the raw stack to the paper figure: segmentation, Sato filter, skeleton, radial zones, 10 rings, figure. |
+| `replication/v3_paper.py` | Applies the paper settings to the unchanged V3 code at run time; runs one field with the V3 classes; the 10-ring profile. |
+| `replication/notebook_method.py` | The per-cell measurement of the interactive V3 notebook (Steps 6b/6c), which made the paper figure. |
+| `replication/ring_plots.py` | Figures for the walkthrough notebook, in the style of the paper figure. |
 | `replication/config_paper.json` | The settings to use (see [Settings](#settings-used)). |
 | `replication/field_lists/` | Which fields to analyse: the exact fields of each paper plate, the 18 representative fields, and the held-out check fields. |
 | `replication/build_stacks.py` | Rebuilds `Z_Stack_Merged/` from a raw Harmony export, byte-identical to the stacks the paper used. |
@@ -33,6 +49,7 @@ No images or result tables are stored here. You need access to the plate folders
 | `replication/compare_to_reference.py` | Compares a re-run with the original result table. |
 | `replication/plot_figure_FG.py` | Redraws paper Fig. F–G (well-median violins) from `paper_stats.py` output. |
 | `environment.yml` | Python environment. |
+| `LICENSE` | MIT. |
 
 ---
 
@@ -87,8 +104,8 @@ layout, edit `well_to_group` in `replication/config_paper.json`.
 ## Step 0: install
 
 ```bash
-git clone git@github.com:Sompaa/TopoActin_V3_Replication.git
-cd TopoActin_V3_Replication
+git clone https://github.com/Sompaa/actin-ring-measurement.git
+cd actin-ring-measurement
 conda env create -f environment.yml
 conda activate topoactin_v3
 ```
@@ -162,7 +179,42 @@ changes" holds best on Exp1.
 
 ---
 
-## Step 2: the representative images
+## Step 2: one field, step by step (the paper figure)
+
+`notebooks/single_image_walkthrough.ipynb` analyses one field and ends with the paper figure. By default
+it uses the example `examples/C9_F13_Z_stack_merged.tiff`; run it top to bottom:
+
+```bash
+jupyter lab notebooks/single_image_walkthrough.ipynb
+```
+
+For another field set `IMAGE` in the first cell (or `ACTIN_IMAGE=<stack> jupyter lab ...`). It shows, in order: the Cellpose segmentation and the cells kept by
+the filters; the Sato tubeness filter on the field; the measurement of every kept cell; for one chosen
+cell the eight intermediate panels (cell, Sato, threshold, skeleton, zones, radial profile, numbers); the
+three panels of the paper figure (original image, radial overlay, distribution plot); and the 10-ring
+profile with the rings merged 3-3-3. Figures (PNG at 300 dpi, SVG) and the per-cell table go to
+`walkthrough_out/`.
+
+**Check:** on the example C9_F13, cell 21 gives inner / mid / outer Sato-weighted density
+0.0015 / 0.0028 / 0.0048, the values printed for that cell on the February 2026 figure slide, with
+the same skeleton and radial profile (tested 2026-10-13, Cellpose 4.2.1.1, GTX 1650; about 1 min).
+
+**Which method makes the figure.** The paper figure was drawn with the interactive V3 notebook
+(Steps 6b/6c of `old_pipeline/TopoActin_V3_Interactive_DOWNSAMPLING.ipynb`), not with the batch run.
+`replication/notebook_method.py` is that per-cell method taken out of the notebook's widgets, unchanged:
+Sato (scikit-image defaults) on the 0–1 rescaled actin maximum projection, threshold at the 55th
+percentile of the cell's Sato values, objects < 3 px removed, closing radius 1, skeleton, r from the
+cell's own nucleus, 10 bins of r. The densities are shown unscaled, as on the paper figure
+(0.001–0.007). Later versions of the notebook (from mid-February 2026) multiplied the displayed
+density by 5 (and intensities by 10) only to put the numbers on the same scale as the batch tables;
+the multiplier is not part of the measurement (`multiplier=5` reproduces it).
+
+The statistics (Step 1) use the batch tables (`main_pipeline_v3.py`); the figure shows the same
+quantity for one cell, measured with the notebook's per-cell settings.
+
+---
+
+## Step 3: the representative images
 
 The paper's example images come from 25 fields of Exp10. 18 of them were also in the analysed set,
 so they have original numbers to compare with; they are listed in
@@ -209,7 +261,7 @@ See [What to expect](#what-to-expect-from-a-re-run) for how close a re-run gets 
 
 ---
 
-## Step 3: whole plates
+## Step 4: whole plates
 
 Same three commands, with the full field list of the plate instead of the 18 fields:
 
@@ -273,8 +325,24 @@ Tested and rejected, with the reason: the 17 Jan notebook's Cellpose sliders (fl
 the custom 3D Sato from the notebooks (no cell-by-cell agreement); a 55th-percentile threshold (kept as
 a sensitivity check: weighted densities ×1.12 instead of ×1.21, but branch counts ×0.72).
 
+**Cellpose model.** The V3 code asks for `pretrained_model='cpsam'` (Cellpose-SAM, Cellpose 4), the
+pretrained model used as published, without retraining. The exact Cellpose version of the January runs
+was not recorded, and the lab's Windows environment was later downgraded to Cellpose 3.1, where the name
+`cpsam` does not exist and Cellpose silently falls back to `cyto3`. So it was checked on the 18
+representative Exp10 fields (same settings, only the model swapped):
+
+| Model | Cells kept | Median cell area (px) | January cells found again |
+|---|---|---|---|
+| January original | 252 | 19,704 | – |
+| Cellpose 3, as coded (falls back to `cyto3`) | 303 | 6,153 | 0 |
+| `cyto2` cells + `nuclei` | 97 | 9,330 | 6 |
+| `cyto2` cells + `cyto2` nuclei | 118 | 9,128 | 5 |
+| **Cellpose 4 `cpsam`** | **256** | **20,170** | **211 (84 %)**, cell area r = 0.999 |
+
+Only `cpsam` gives January's cells, so the paper runs used Cellpose 4 `cpsam`.
+
 `run_v3.py` applies the two code-level switches (intensity on the adjusted image, bright-ridge Sato)
-at run time; the files in `old_pipeline/` are not edited. Every run writes `settings_used.json`.
+at run time through `replication/v3_paper.py`; the files in `old_pipeline/` are not edited. Every run writes `settings_used.json`.
 
 ---
 
@@ -302,14 +370,14 @@ What this means:
 
 - **The same cells.** 77–92 % of January's cells come out again, and about as many cells are kept
   in total. Most of the rest is Cellpose: for ~8 % of January's cells there is no matching mask at all
-  today (the January Cellpose version was not recorded).
+  today (the exact Cellpose 4 release of January was not recorded; see [Settings](#settings-used)).
 - **The paper's two measurements are on the same scale and track January cell by cell**, within
   2–20 % depending on the plate.
 - **Fidelity reads higher** (×1.3–1.4) and does not track January cell by cell; every re-run cell
   passes the ≥ 0.25 quality cut, against ~97 % in January. The skeleton's fine structure is the part
   that could not be fully reconstructed. Branch counts do match (×1.04, r 0.94, on Exp10).
 - **Per well**, with only 2 fields per held-out well, most wells are within ~10 % of January and a
-  few differ by 20–40 %. Whole plates (10 fields per well) are the real test: run Step 3 and plot
+  few differ by 20–40 %. Whole plates (10 fields per well) are the real test: run Step 4 and plot
   `well_medians.csv` new against January.
 
 For the paper claim, what must hold on the re-run plates is the **direction and significance** of

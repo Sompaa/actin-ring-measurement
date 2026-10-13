@@ -13,3 +13,8 @@ stats_out/
 compare_out/
 __pycache__/
 .ipynb_checkpoints/
+
+# ...except the example fields and their January reference rows
+!examples/*.tiff
+!examples/*.csv
+walkthrough_out/

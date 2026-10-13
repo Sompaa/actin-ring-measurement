@@ -72,7 +72,8 @@ def main():
                      "median_ratio_new_over_ref": np.median(n[ok] / r[ok]),
                      "correlation": corr,
                      "median_rel_diff": np.median(np.abs(n[ok] - r[ok]) / np.abs(r[ok]))})
-    agree = pd.DataFrame(rows)
+    agree = pd.DataFrame(rows, columns=["metric", "matched_cells", "median_ratio_new_over_ref",
+                                        "correlation", "median_rel_diff"])
     agree.to_csv(out / "metric_agreement.csv", index=False)
 
     for d in (ref, new_c):
