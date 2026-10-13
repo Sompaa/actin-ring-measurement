@@ -4,13 +4,14 @@
 
 Each CSV is treated as one experiment and analysed on its own:
 
-1. within each treatment x well, clip each value to that well's 5th-95th
+1. keep cells with skeleton fidelity >= 0.25 (--fidelity-min)
+2. within each treatment x well, clip each value to that well's 5th-95th
    percentile (winsorizing: extreme cells are pulled in, not removed)
-2. one median per feature per well (the well is the replicate, not the cell)
-3. KpSen (ancestor) wells vs BasR wells: unpaired Mann-Whitney U test
-4. effect = median of BasR well medians minus median of KpSen well medians,
+3. one median per feature per well (the well is the replicate, not the cell)
+4. KpSen (ancestor) wells vs BasR wells: unpaired Mann-Whitney U test
+5. effect = median of BasR well medians minus median of KpSen well medians,
    with a 95% interval from 2000 bootstrap resamples of the wells
-5. Benjamini-Hochberg correction across all features of that experiment
+6. Benjamini-Hochberg correction across all features of that experiment
 
 Writes stats_<name>.csv per experiment and stats_headline.csv with
 cortical_weighted_density and cortical_intensity side by side.
@@ -49,8 +50,8 @@ def bh(p):
     return q
 
 
-def well_medians(df, features, lo, hi):
-    df = df.copy()
+def well_medians(df, features, fidelity_min, lo, hi):
+    df = df[df["fidelity"] >= fidelity_min].copy()
     df["well"] = df["image_name"].str.split("_").str[0]
 
     def clip(g):
@@ -64,10 +65,10 @@ def well_medians(df, features, lo, hi):
     return df.groupby(["group", "well"])[features].median().reset_index()
 
 
-def analyse(df, ref="KpSen", test="BasR", lo=0.05, hi=0.95, n_boot=2000, seed=0):
+def analyse(df, ref="KpSen", test="BasR", fidelity_min=0.25, lo=0.05, hi=0.95, n_boot=2000, seed=0):
     features = [c for c in df.columns if c not in META and pd.api.types.is_numeric_dtype(df[c])]
     n_cells = len(df)
-    wm = well_medians(df, features, lo, hi)
+    wm = well_medians(df, features, fidelity_min, lo, hi)
     a = wm[wm["group"] == ref]
     b = wm[wm["group"] == test]
     rng = np.random.default_rng(seed)
@@ -85,17 +86,18 @@ def analyse(df, ref="KpSen", test="BasR", lo=0.05, hi=0.95, n_boot=2000, seed=0)
                      f"n_wells_{ref}": len(x), f"n_wells_{test}": len(y), "p": p})
     res = pd.DataFrame(rows)
     res["q_BH"] = bh(res["p"])
-    return res.sort_values("p").reset_index(drop=True), n_cells
+    kept = (df["fidelity"] >= fidelity_min).mean()
+    return res.sort_values("p").reset_index(drop=True), n_cells, kept
 
 
-def pooled_lmm(frames, ref="KpSen", test="BasR"):
+def pooled_lmm(frames, ref="KpSen", test="BasR", fidelity_min=0.25):
     import warnings
     import statsmodels.formula.api as smf
 
     wms = []
     for name, df in frames:
         features = [c for c in df.columns if c not in META and pd.api.types.is_numeric_dtype(df[c])]
-        wms.append(well_medians(df, features, 0.05, 0.95).assign(experiment=name))
+        wms.append(well_medians(df, features, fidelity_min, 0.05, 0.95).assign(experiment=name))
     wm = pd.concat(wms, ignore_index=True)
     feats = [c for c in wm.columns if c not in {"group", "well", "experiment"}]
     sub = wm[wm.group.isin([ref, test])].copy()
@@ -123,6 +125,8 @@ def main():
     ap.add_argument("csv", nargs="+")
     ap.add_argument("-o", "--out", default="stats_out")
     ap.add_argument("--names", nargs="*", help="short names, one per CSV (default: file stem)")
+    ap.add_argument("--fidelity-min", type=float, default=0.25,
+                    help="minimum skeleton fidelity of a cell (default 0.25; 0 keeps all cells)")
     args = ap.parse_args()
 
     out = Path(args.out)
@@ -132,9 +136,9 @@ def main():
     for name, path in zip(names, args.csv):
         df = pd.read_csv(path, low_memory=False)
         frames.append((name, df))
-        res, n = analyse(df)
+        res, n, kept = analyse(df, fidelity_min=args.fidelity_min)
         res.to_csv(out / f"stats_{name}.csv", index=False)
-        print(f"\n== {name}: {n} cells")
+        print(f"\n== {name}: {n} cells, {kept:.1%} with fidelity >= {args.fidelity_min}")
         h = res[res["feature"].isin(HEADLINE)]
         print(h[["feature", "KpSen_median", "BasR_median", "median_diff", "ci95_low", "ci95_high", "p", "q_BH"]]
               .to_string(index=False, float_format=lambda v: f"{v:.4g}"))
@@ -142,7 +146,7 @@ def main():
     pd.concat(head).to_csv(out / "stats_headline.csv", index=False)
 
     if len(frames) > 1:
-        res, wm = pooled_lmm(frames)
+        res, wm = pooled_lmm(frames, fidelity_min=args.fidelity_min)
         res.to_csv(out / "stats_pooled_lmm.csv", index=False)
         wm.to_csv(out / "well_medians_pooled.csv", index=False)
         print(f"\n== Pooled, mixed model with experiment as random effect ({len(frames)} experiments)")

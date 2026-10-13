@@ -37,7 +37,7 @@ without retraining.
 | `replication/build_stacks.py` | Builds `Z_Stack_Merged/` from a Harmony export; output is byte-identical to the stacks used in the original analysis. |
 | `replication/prepare_input.py` | Collects selected fields of a plate into one input folder. |
 | `replication/run_v3.py` | Runs the V3 batch pipeline on an input folder with the analysis settings. |
-| `replication/paper_stats.py` | Statistical analysis (winsorization, well medians, Mann-Whitney U test, bootstrap confidence intervals, Benjamini-Hochberg correction, linear mixed model). |
+| `replication/paper_stats.py` | Statistical analysis (skeleton fidelity filter, winsorization, well medians, Mann-Whitney U test, bootstrap confidence intervals, Benjamini-Hochberg correction, linear mixed model). |
 | `replication/compare_to_reference.py` | Cell-by-cell and well-level comparison of a re-run with the original results. |
 | `replication/plot_figure_FG.py` | Well-median violin plots (figure panels F and G) from the output of `paper_stats.py`. |
 | `environment.yml` | Conda environment. |
@@ -113,12 +113,13 @@ python replication/paper_stats.py \
 
 For each plate separately the script:
 
-1. winsorizes each measurement within each well at the 5th and 95th percentiles;
-2. takes the median of each measurement per well, the well being the experimental unit;
-3. compares the 24 KpSen and 24 BasR wells with a two-sided Mann-Whitney U test;
-4. reports the difference of medians (BasR minus KpSen) with a 95 % confidence interval from 2,000
+1. excludes cells with skeleton fidelity < 0.25 (see Supplementary Text 6);
+2. winsorizes each measurement within each well at the 5th and 95th percentiles;
+3. takes the median of each measurement per well, the well being the experimental unit;
+4. compares the 24 KpSen and 24 BasR wells with a two-sided Mann-Whitney U test;
+5. reports the difference of medians (BasR minus KpSen) with a 95 % confidence interval from 2,000
    bootstrap resamples of wells;
-5. corrects for the approximately 39 measurements tested with the Benjamini-Hochberg procedure
+6. corrects for the approximately 39 measurements tested with the Benjamini-Hochberg procedure
    (column `q_BH`).
 
 Output: `stats_<name>.csv` (all measurements) and `stats_headline.csv` (the reported measurements).
@@ -136,24 +137,24 @@ Results on the original per-cell tables:
 
 | Plate | Measurement | KpSen | BasR | BasR − KpSen (95 % CI) | q (BH) |
 |---|---|---|---|---|---|
-| Exp1 | cortical_weighted_density | 163.0 | 191.3 | +28.2 (7.4 to 46.8) | 0.037 |
-| Exp1 | cortical_intensity | 12,180 | 15,570 | +3,399 (1,980 to 4,200) | 0.0005 |
-| Exp8 | cortical_weighted_density | 146.4 | 172.9 | +26.5 (12.2 to 51.4) | 0.009 |
-| Exp8 | cortical_intensity | 10,450 | 12,780 | +2,327 (497 to 3,775) | 0.009 |
-| Exp10 | cortical_weighted_density | 149.8 | 195.8 | +46.0 (21.8 to 68.7) | 0.005 |
-| Exp10 | cortical_intensity | 10,180 | 13,480 | +3,296 (1,668 to 6,105) | 0.002 |
+| Exp1 | cortical_weighted_density | 164.2 | 191.3 | +27.1 (6.1 to 47.5) | 0.021 |
+| Exp1 | cortical_intensity | 12,290 | 15,550 | +3,269 (2,135 to 4,154) | 0.0001 |
+| Exp8 | cortical_weighted_density | 148.5 | 173.7 | +25.1 (10.5 to 50.2) | 0.007 |
+| Exp8 | cortical_intensity | 10,470 | 12,970 | +2,495 (585 to 3,624) | 0.007 |
+| Exp10 | cortical_weighted_density | 150.0 | 196.6 | +46.6 (22.2 to 68.6) | 0.003 |
+| Exp10 | cortical_intensity | 10,180 | 13,590 | +3,409 (1,639 to 6,270) | 0.002 |
 
 BasR exceeds KpSen for both measurements in all three experiments, and all differences remain
 significant after correction. Bootstrap intervals can vary slightly between machines; medians and
 p-values are deterministic.
 
-Pooled mixed model over the three plates: `cortical_weighted_density` +33.2 (95 % CI 22.9 to 43.5,
-q = 5×10⁻⁹), `cortical_intensity` +3,216 (2,467 to 3,965, q = 1×10⁻¹⁵). Well-median ranges (figure
-panels F and G): weighted density KpSen 88.1 to 230.0, BasR 117.4 to 273.9, control median 142.0;
-intensity KpSen 5,957 to 16,477, BasR 8,664 to 21,223, control median 10,907.
+Pooled mixed model over the three plates: `cortical_weighted_density` +33.8 (95 % CI 23.7 to 44.0,
+q = 1×10⁻⁹), `cortical_intensity` +3,285 (2,538 to 4,031, q = 2×10⁻¹⁶). Well-median ranges (figure
+panels F and G): weighted density KpSen 90 to 230, BasR 120 to 277, control median 145; intensity
+KpSen 5,817 to 15,763, BasR 8,811 to 21,117, control median 10,911.
 
 The number of measurements that differ between KpSen and BasR varies between plates (7 of 39 in Exp1,
-14 in Exp8, 31 in Exp10). A change restricted to the cortex is therefore best supported by Exp1.
+14 in Exp8, 32 in Exp10). A change restricted to the cortex is therefore best supported by Exp1.
 
 ## 2. Single-field analysis and figure
 
@@ -313,6 +314,7 @@ cell-level Pearson correlation.
 | inner_intensity | 1.03 (r 0.96) | 1.08 (r 0.99) | 1.08 (r 0.92) |
 | cortical_weighted_density | 1.20 (r 0.84) | 0.98 (r 0.89) | 1.15 (r 0.82) |
 | skeleton_density | 1.11 | 1.11 | 1.16 |
+| fidelity | 1.30 | 1.30 | 1.39 |
 
 With the February settings, the same Exp10 fields gave 183 cells, 56 % recovery, `cortical_intensity`
 ×0.88, `cortical_weighted_density` ×0.70 and branch counts ×1.5.
